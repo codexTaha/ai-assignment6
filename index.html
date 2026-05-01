@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Wumpus World Agent</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="page">
+        <h1>Dynamic Pathfinding Agent</h1>
+
+        <div class="controls">
+            <label>
+                Rows
+                <input type="number" id="rowsInput" min="2" placeholder="4">
+            </label>
+
+            <label>
+                Columns
+                <input type="number" id="colsInput" min="2" placeholder="4">
+            </label>
+
+            <button id="startButton">Start New Episode</button>
+            <button id="nextButton" disabled>Next Step</button>
+        </div>
+
+        <div class="info">
+            <p><strong>Current Location:</strong> <span id="locationText">-</span></p>
+            <p><strong>Current Percepts:</strong> <span id="perceptText">-</span></p>
+            <p><strong>Total Inference Steps:</strong> <span id="stepsText">0</span></p>
+        </div>
+
+        <div class="legend">
+            <span><span class="legend-box agent-color"></span>Agent</span>
+            <span><span class="legend-box visited-color"></span>Visited Safe</span>
+            <span><span class="legend-box unknown-color"></span>Unknown</span>
+            <span><span class="legend-box hazard-color"></span>Confirmed Hazard</span>
+        </div>
+
+        <div id="grid" class="grid"></div>
+
+        <h2>Agent Log</h2>
+        <div id="logArea" class="log-area"></div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
