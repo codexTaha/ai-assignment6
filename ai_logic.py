@@ -106,6 +106,8 @@ def make_new_game(rows, cols):
     add_cell(state["safe_cells"], 1, 1)
     state["decision_log"].append("New game created with hidden Wumpus and pits.")
     state["decision_log"].append("Agent starts at (1,1).")
+    sense_current_cell(state)
+    state["status"] = "New episode started. Click an adjacent proven-safe cell to move."
     last_created_state = state
 
     return get_visible_state(state)
@@ -443,69 +445,7 @@ def update_safe_and_hazard_cells(state):
                 add_cell(state["confirmed_hazards"], row, col)
 
 
-def choose_next_move(state):
-    adjacent_cells = get_adjacent_cells(
-        state["agent_row"],
-        state["agent_col"],
-        state["rows"],
-        state["cols"]
-    )
-
-    for cell in adjacent_cells:
-        if not cell_in_list(state["visited"], cell["row"], cell["col"]):
-            if cell_in_list(state["safe_cells"], cell["row"], cell["col"]):
-                state["decision_log"].append(
-                    "ASK KB: Is (" + str(cell["row"]) + "," + str(cell["col"]) + ") safe?"
-                )
-                state["last_query"] = "ASK KB: Is cell (" + str(cell["row"]) + "," + str(cell["col"]) + ") safe?"
-                state["last_query_result"] = "Proven safe"
-                state["last_resolution_steps"] = ["Known facts prove no pit and no Wumpus."]
-                state["decision_log"].append("Result: Safe")
-                return cell
-
-            if ask_if_safe(state, cell["row"], cell["col"]):
-                add_cell(state["safe_cells"], cell["row"], cell["col"])
-                return cell
-
-    path_move = find_step_towards_unvisited_safe_cell(state)
-    if path_move is not None:
-        state["decision_log"].append(
-            "Moving through known safe cell toward another safe unvisited cell."
-        )
-        return path_move
-
-    return None
-
-
-def find_step_towards_unvisited_safe_cell(state):
-    queue = []
-    checked = []
-    start = {"row": state["agent_row"], "col": state["agent_col"], "path": []}
-    queue.append(start)
-
-    while len(queue) > 0:
-        current = queue.pop(0)
-
-        if cell_in_list(checked, current["row"], current["col"]):
-            continue
-
-        add_cell(checked, current["row"], current["col"])
-
-        if not cell_in_list(state["visited"], current["row"], current["col"]) and len(current["path"]) > 0:
-            return current["path"][0]
-
-        neighbors = get_adjacent_cells(current["row"], current["col"], state["rows"], state["cols"])
-
-        for cell in neighbors:
-            if cell_in_list(state["safe_cells"], cell["row"], cell["col"]) and not cell_in_list(checked, cell["row"], cell["col"]):
-                new_path = current["path"][:]
-                new_path.append({"row": cell["row"], "col": cell["col"]})
-                queue.append({"row": cell["row"], "col": cell["col"], "path": new_path})
-
-    return None
-
-
-def step_agent(state):
+def sense_current_cell(state):
     if state is None:
         return make_new_game(4, 4)
 
@@ -520,25 +460,55 @@ def step_agent(state):
     tell_current_cell_to_kb(state)
     add_cell(state["visited"], state["agent_row"], state["agent_col"])
     add_cell(state["safe_cells"], state["agent_row"], state["agent_col"])
-
     update_safe_and_hazard_cells(state)
-    next_cell = choose_next_move(state)
+    trim_decision_log(state)
+    return get_visible_state(state)
 
-    if next_cell is None:
-        state["status"] = "No provably safe unvisited adjacent cell found."
-        state["game_over"] = True
+
+def try_user_move(state, target_row, target_col):
+    if state is None:
+        return make_new_game(4, 4)
+
+    target_row = int(target_row)
+    target_col = int(target_col)
+    state["decision_log"].append("User selected move to (" + str(target_row) + "," + str(target_col) + ").")
+
+    if state["game_over"]:
+        state["status"] = "Move rejected: game is already over."
         state["decision_log"].append(state["status"])
-    else:
-        state["agent_row"] = next_cell["row"]
-        state["agent_col"] = next_cell["col"]
-        add_cell(state["visited"], state["agent_row"], state["agent_col"])
-        state["status"] = "Agent moved safely."
-        state["decision_log"].append(
-            "Agent moved to (" + str(state["agent_row"]) + "," + str(state["agent_col"]) + ")."
-        )
-        next_percepts = get_percepts(state, state["agent_row"], state["agent_col"])
-        state["current_percepts"] = percepts_to_list(next_percepts)
+        trim_decision_log(state)
+        return get_visible_state(state)
 
+    adjacent_cells = get_adjacent_cells(
+        state["agent_row"],
+        state["agent_col"],
+        state["rows"],
+        state["cols"]
+    )
+
+    if not cell_in_list(adjacent_cells, target_row, target_col):
+        state["status"] = "Move rejected: you can only move to adjacent cells."
+        state["decision_log"].append(state["status"])
+        trim_decision_log(state)
+        return get_visible_state(state)
+
+    safe = ask_if_safe(state, target_row, target_col)
+
+    if not safe:
+        state["status"] = "Move rejected: cell (" + str(target_row) + "," + str(target_col) + ") is not provably safe by the KB."
+        state["decision_log"].append(state["status"])
+        trim_decision_log(state)
+        return get_visible_state(state)
+
+    state["agent_row"] = target_row
+    state["agent_col"] = target_col
+    add_cell(state["visited"], target_row, target_col)
+    add_cell(state["safe_cells"], target_row, target_col)
+    state["status"] = "Moved to (" + str(target_row) + "," + str(target_col) + ")."
+    state["decision_log"].append("Move accepted: " + state["status"])
+
+    sense_current_cell(state)
+    state["status"] = "Moved to (" + str(target_row) + "," + str(target_col) + ")."
     trim_decision_log(state)
     return get_visible_state(state)
 

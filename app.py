@@ -1,7 +1,7 @@
 from flask import Flask, jsonify, render_template, request
 
 import ai_logic
-from ai_logic import get_visible_state, make_new_game, reveal_world, step_agent
+from ai_logic import get_visible_state, make_new_game, reveal_world, try_user_move
 
 
 app = Flask(__name__)
@@ -25,14 +25,17 @@ def api_start():
     return jsonify(visible_state)
 
 
-@app.route("/api/step", methods=["POST"])
-def api_step():
+@app.route("/api/move", methods=["POST"])
+def api_move():
     global current_state
 
     if current_state is None:
         current_state = make_internal_game(4, 4)
 
-    return jsonify(step_agent(current_state))
+    data = request.get_json() or {}
+    row = data.get("row", 1)
+    col = data.get("col", 1)
+    return jsonify(try_user_move(current_state, row, col))
 
 
 @app.route("/api/reveal", methods=["POST"])

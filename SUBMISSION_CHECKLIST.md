@@ -15,16 +15,16 @@
 - KB / inference panel showing recent facts and last query
 - Agent decision log after several moves
 - Reveal Hidden World showing red hazards
-- Auto Run or final stopped state
+- Rejected move message for non-adjacent or unsafe cell
 
 ## Final Testing Checklist
 
 - Start New Episode works
 - 4x4 grid works
 - 5x5 grid works
-- Next Step works
-- Auto Run works
-- Stop Auto Run works
+- Adjacent safe cell click moves the agent
+- Non-adjacent cell click is rejected
+- Unknown or not-proven-safe cell click is rejected
 - Reveal Hidden World works
 - Reset works
 - Metrics update after movement

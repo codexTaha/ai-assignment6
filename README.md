@@ -23,7 +23,7 @@ Python handles:
 - CNF clauses
 - Resolution Refutation
 - Safe-cell deduction
-- Pathfinding and movement decisions
+- Move validation and safety decisions
 
 ## Frontend
 
@@ -86,7 +86,7 @@ JavaScript is used only for the web interface.
 - Agent decision log
 - KB / inference panel
 - Reveal hidden world option
-- Auto Run and Stop Auto Run
+- Manual click-to-move gameplay
 
 ## AI Concepts Used
 
@@ -132,18 +132,21 @@ The rules are stored as CNF clauses. A clause is a list of literals, for example
 
 The project proves queries using Resolution Refutation. This is used to prove whether a cell has no pit and no Wumpus.
 
-### Pathfinding Using Logical Inference
+### User Movement Using Logical Inference
 
-The agent checks adjacent cells and moves only if the Knowledge Base proves the cell is safe.
+The user clicks a neighboring cell. The Python backend checks whether the move is adjacent and whether the Knowledge Base can prove the cell is safe.
 
 ## How the Agent Works
 
 1. Agent starts at `(1,1)`.
 2. It receives percepts.
 3. It tells the KB new facts.
-4. It asks if adjacent cells are safe.
-5. It moves only to provably safe cells.
-6. It stops if no safe move is provable.
+4. The user clicks a neighboring cell.
+5. Python asks if the selected cell is safe.
+6. The move is accepted only if the cell is adjacent and provably safe.
+7. If the cell is not safe or not adjacent, Python rejects the move and returns a status message.
+
+Repeated movement was intentionally removed because the project is now a user-playable Wumpus World game.
 
 ## Resolution Refutation
 

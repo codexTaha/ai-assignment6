@@ -34,6 +34,12 @@ h2 {
     padding-bottom: 10px;
 }
 
+.instruction-text {
+    margin: 12px 0 0 0;
+    color: #555;
+    font-weight: bold;
+}
+
 .controls {
     display: flex;
     flex-wrap: wrap;
@@ -116,6 +122,15 @@ button:disabled {
     gap: 5px;
     font-size: 12px;
     border-radius: 4px;
+    color: #222;
+    cursor: pointer;
+    font-family: Arial, sans-serif;
+    padding: 0;
+}
+
+.cell:hover {
+    outline: 3px solid #2f3a45;
+    outline-offset: 1px;
 }
 
 .cell-coord {
@@ -147,6 +162,11 @@ button:disabled {
 .hazard-color,
 .hazard {
     background: #d94a4a;
+    color: white;
+}
+
+.revealed-hazard {
+    background: #9f2424;
     color: white;
 }
 

@@ -1,13 +1,9 @@
-let autoRunTimer = null;
 let latestState = null;
 let requestRunning = false;
 
 const rowsInput = document.getElementById("rowsInput");
 const colsInput = document.getElementById("colsInput");
 const startButton = document.getElementById("startButton");
-const nextButton = document.getElementById("nextButton");
-const autoButton = document.getElementById("autoButton");
-const stopButton = document.getElementById("stopButton");
 const revealButton = document.getElementById("revealButton");
 const resetButton = document.getElementById("resetButton");
 
@@ -28,15 +24,10 @@ const explanationArea = document.getElementById("explanationArea");
 const logArea = document.getElementById("logArea");
 
 startButton.addEventListener("click", startGame);
-nextButton.addEventListener("click", nextStep);
-autoButton.addEventListener("click", autoRun);
-stopButton.addEventListener("click", stopAutoRun);
 revealButton.addEventListener("click", revealWorld);
 resetButton.addEventListener("click", resetGame);
 
 async function startGame() {
-    stopAutoRun();
-
     let rows = parseInt(rowsInput.value);
     let cols = parseInt(colsInput.value);
 
@@ -55,7 +46,7 @@ async function startGame() {
     renderState(state);
 }
 
-async function nextStep() {
+async function moveToCell(row, col) {
     if (requestRunning) {
         return;
     }
@@ -64,19 +55,16 @@ async function nextStep() {
     let state = null;
 
     try {
-        state = await sendPostRequest("/api/step", {});
+        state = await sendPostRequest("/api/move", {
+            row: row,
+            col: col
+        });
     } finally {
         requestRunning = false;
     }
 
-    if (state === null) {
-        return;
-    }
-
-    renderState(state);
-
-    if (state.game_over) {
-        stopAutoRun();
+    if (state !== null) {
+        renderState(state);
     }
 }
 
@@ -86,30 +74,11 @@ async function revealWorld() {
 }
 
 async function resetGame() {
-    stopAutoRun();
     rowsInput.value = "";
     colsInput.value = "";
 
     let state = await sendPostRequest("/api/reset", {});
     renderState(state);
-}
-
-function autoRun() {
-    if (autoRunTimer !== null) {
-        return;
-    }
-
-    autoRunTimer = setInterval(nextStep, 900);
-    updateButtons();
-}
-
-function stopAutoRun() {
-    if (autoRunTimer !== null) {
-        clearInterval(autoRunTimer);
-        autoRunTimer = null;
-    }
-
-    updateButtons();
 }
 
 async function loadCurrentState() {
@@ -145,9 +114,10 @@ function renderGrid(state) {
 
     for (let row = 1; row <= state.rows; row++) {
         for (let col = 1; col <= state.cols; col++) {
-            let cellDiv = document.createElement("div");
+            let cellDiv = document.createElement("button");
             let stateText = "Unknown";
             cellDiv.className = "cell unknown";
+            cellDiv.type = "button";
 
             if (cellExists(state.safe_cells, row, col) || cellExists(state.visited, row, col)) {
                 cellDiv.className = "cell visited";
@@ -161,12 +131,12 @@ function renderGrid(state) {
 
             if (state.revealed && state.actual_wumpus &&
                 state.actual_wumpus.row === row && state.actual_wumpus.col === col) {
-                cellDiv.className = "cell hazard";
+                cellDiv.className = "cell revealed-hazard";
                 stateText = "Wumpus";
             }
 
             if (state.revealed && cellExists(state.actual_pits || [], row, col)) {
-                cellDiv.className = "cell hazard";
+                cellDiv.className = "cell revealed-hazard";
                 stateText = "Pit";
             }
 
@@ -174,6 +144,10 @@ function renderGrid(state) {
                 cellDiv.className = "cell agent";
                 stateText = "Agent";
             }
+
+            cellDiv.addEventListener("click", function () {
+                moveToCell(row, col);
+            });
 
             cellDiv.appendChild(makeCellLine("(" + row + "," + col + ")", "cell-coord"));
             cellDiv.appendChild(makeCellLine(stateText, "cell-state"));
@@ -228,27 +202,17 @@ function renderLineList(area, items, emptyText) {
 }
 
 function updateButtons() {
-    if (latestState && latestState.game_over) {
-        nextButton.disabled = true;
-        autoButton.disabled = true;
-        stopButton.disabled = true;
-    } else {
-        nextButton.disabled = false;
-        autoButton.disabled = autoRunTimer !== null;
-        stopButton.disabled = autoRunTimer === null;
-    }
-
     revealButton.disabled = false;
 }
 
 function updateStatusStyle(status) {
     statusText.className = "";
 
-    if (status.includes("safely") || status.includes("started")) {
+    if (status.includes("Moved") || status.includes("started")) {
         statusText.className = "status-good";
     }
 
-    if (status.includes("No provably") || status.includes("hazard")) {
+    if (status.includes("rejected") || status.includes("hazard")) {
         statusText.className = "status-warn";
     }
 }
