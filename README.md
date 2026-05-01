@@ -249,6 +249,7 @@ gunicorn app:app
 
 GitHub: <https://github.com/codexTaha/ai-assignment6>
 
+
 ## Author
 
 codexTaha
