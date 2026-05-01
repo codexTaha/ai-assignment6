@@ -18,6 +18,20 @@ The project is a Vanilla HTML, CSS, and JavaScript web app. It creates a Wumpus 
 - Basic web GUI
 - Step-by-step agent movement
 
+## Features Added in Step 2
+
+- Cleaner web GUI with cards and panels
+- Grid cells show coordinate and state
+- Auto Run and Stop Auto Run controls
+- Reveal Hidden World button
+- Reset button
+- Live metrics dashboard
+- Recent KB facts panel
+- Last ASK query and result display
+- Short resolution explanation display
+- Improved readable agent decision log
+- Confirmed hazards are checked for unknown cells
+
 ## How to Run
 
 Open `index.html` in a browser.

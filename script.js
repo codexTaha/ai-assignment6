@@ -15,19 +15,45 @@ let confirmedHazardCells = [];
 let currentPercepts = [];
 let totalInferenceSteps = 0;
 let gameOver = false;
+let hiddenWorldRevealed = false;
+let autoRunTimer = null;
+let lastMoveDecision = "-";
+let statusMessage = "Ready";
+let recentKbFacts = [];
+let lastQueryText = "-";
+let lastQueryResultText = "-";
+let lastExplanation = [];
 
 const rowsInput = document.getElementById("rowsInput");
 const colsInput = document.getElementById("colsInput");
 const startButton = document.getElementById("startButton");
 const nextButton = document.getElementById("nextButton");
+const autoButton = document.getElementById("autoButton");
+const stopButton = document.getElementById("stopButton");
+const revealButton = document.getElementById("revealButton");
+const resetButton = document.getElementById("resetButton");
 const gridDiv = document.getElementById("grid");
+const gridSizeText = document.getElementById("gridSizeText");
 const locationText = document.getElementById("locationText");
 const perceptText = document.getElementById("perceptText");
+const visitedText = document.getElementById("visitedText");
+const safeText = document.getElementById("safeText");
+const hazardText = document.getElementById("hazardText");
 const stepsText = document.getElementById("stepsText");
+const decisionText = document.getElementById("decisionText");
+const statusText = document.getElementById("statusText");
+const kbFactsArea = document.getElementById("kbFactsArea");
+const lastQueryTextArea = document.getElementById("lastQueryText");
+const lastResultText = document.getElementById("lastResultText");
+const explanationArea = document.getElementById("explanationArea");
 const logArea = document.getElementById("logArea");
 
 startButton.addEventListener("click", start_new_episode);
 nextButton.addEventListener("click", next_step);
+autoButton.addEventListener("click", start_auto_run);
+stopButton.addEventListener("click", stop_auto_run);
+revealButton.addEventListener("click", reveal_hidden_world);
+resetButton.addEventListener("click", reset_episode);
 
 function get_adjacent_cells(row, col) {
     let cells = [];
@@ -58,11 +84,12 @@ function add_clause(clause) {
 
     for (let i = 0; i < kb.length; i++) {
         if (clause_to_key(kb[i]) === key) {
-            return;
+            return false;
         }
     }
 
     kb.push(cleanClause);
+    return true;
 }
 
 function add_percept_to_kb(row, col, breeze, stench) {
@@ -70,21 +97,43 @@ function add_percept_to_kb(row, col, breeze, stench) {
     let wumpusSymbol = make_symbol("W", row, col);
     let breezeSymbol = make_symbol("B", row, col);
     let stenchSymbol = make_symbol("S", row, col);
+    let factsAdded = [];
 
     // The agent knows the current visited cell is safe.
-    add_clause(["!" + pitSymbol]);
-    add_clause(["!" + wumpusSymbol]);
+    add_kb_fact("!" + pitSymbol, factsAdded);
+    add_kb_fact("!" + wumpusSymbol, factsAdded);
 
     if (breeze) {
-        add_clause([breezeSymbol]);
+        add_kb_fact(breezeSymbol, factsAdded);
     } else {
-        add_clause(["!" + breezeSymbol]);
+        add_kb_fact("!" + breezeSymbol, factsAdded);
     }
 
     if (stench) {
-        add_clause([stenchSymbol]);
+        add_kb_fact(stenchSymbol, factsAdded);
     } else {
-        add_clause(["!" + stenchSymbol]);
+        add_kb_fact("!" + stenchSymbol, factsAdded);
+    }
+
+    if (factsAdded.length > 0) {
+        add_log("TELL KB: " + factsAdded.join(", "));
+    }
+}
+
+function add_kb_fact(fact, factsAdded) {
+    let added = add_clause([fact]);
+
+    if (added) {
+        factsAdded.push(fact);
+        add_recent_kb_fact(fact);
+    }
+}
+
+function add_recent_kb_fact(fact) {
+    recentKbFacts.unshift(fact);
+
+    if (recentKbFacts.length > 8) {
+        recentKbFacts.pop();
     }
 }
 
@@ -167,7 +216,7 @@ function resolution_refutation(query_literal) {
     let negatedQuery = negate_literal(query_literal);
     let explanation = [];
     let steps = 0;
-    let maxSteps = 500;
+    let maxSteps = 100;
 
     clauses.push([negatedQuery]);
 
@@ -251,15 +300,28 @@ function ask_if_safe(row, col) {
 
     let pitResult = ask_if_true(pitQuery);
     let wumpusResult = ask_if_true(wumpusQuery);
+    let safe = pitResult.proven && wumpusResult.proven;
+
+    lastQueryText = "ASK KB: Is cell (" + row + ", " + col + ") safe?";
+
+    if (safe) {
+        lastQueryResultText = "Proven safe";
+    } else {
+        lastQueryResultText = "Not proven safe";
+    }
+
+    lastExplanation = pitResult.explanation.concat(wumpusResult.explanation).slice(0, 6);
 
     return {
-        safe: pitResult.proven && wumpusResult.proven,
+        safe: safe,
         pitResult: pitResult,
         wumpusResult: wumpusResult
     };
 }
 
 function start_new_episode() {
+    stop_auto_run();
+
     rows = parseInt(rowsInput.value);
     cols = parseInt(colsInput.value);
 
@@ -280,6 +342,13 @@ function start_new_episode() {
     currentPercepts = [];
     totalInferenceSteps = 0;
     gameOver = false;
+    hiddenWorldRevealed = false;
+    lastMoveDecision = "Episode started";
+    statusMessage = "Episode running";
+    recentKbFacts = [];
+    lastQueryText = "-";
+    lastQueryResultText = "-";
+    lastExplanation = [];
 
     place_hazards();
     build_world_rules();
@@ -293,6 +362,9 @@ function start_new_episode() {
     add_log("Hidden Wumpus and pits were placed. The agent only knows the start cell.");
 
     nextButton.disabled = false;
+    autoButton.disabled = false;
+    stopButton.disabled = true;
+    revealButton.disabled = false;
     update_gui();
 }
 
@@ -326,30 +398,35 @@ function place_hazards() {
 
 function next_step() {
     if (gameOver) {
+        stop_auto_run();
+        return;
+    }
+
+    if (agent_is_on_actual_hazard()) {
+        statusMessage = "Agent entered an actual hazard.";
+        lastMoveDecision = "Stopped on hazard";
+        gameOver = true;
+        stop_auto_run();
+        update_buttons();
+        update_gui();
         return;
     }
 
     let percept = get_percepts(agentRow, agentCol);
-    currentPercepts = [];
-
-    if (percept.breeze) {
-        currentPercepts.push("Breeze");
-    }
-    if (percept.stench) {
-        currentPercepts.push("Stench");
-    }
-    if (currentPercepts.length === 0) {
-        currentPercepts.push("None");
-    }
+    set_current_percepts_from_percept(percept);
 
     add_percept_to_kb(agentRow, agentCol, percept.breeze, percept.stench);
     add_to_list(visitedCells, agentRow, agentCol);
     add_to_list(safeCells, agentRow, agentCol);
 
-    add_log("Visited (" + agentRow + ", " + agentCol + ") and perceived: " + currentPercepts.join(", ") + ".");
+    add_log("Agent at (" + agentRow + ", " + agentCol + ")");
+    add_log("Percepts: " + format_percepts_for_log(percept));
 
     let adjacentCells = get_adjacent_cells(agentRow, agentCol);
     let nextCell = null;
+
+    update_unknown_cells();
+    scan_unknown_cells_for_hazards();
 
     for (let i = 0; i < adjacentCells.length; i++) {
         let cell = adjacentCells[i];
@@ -357,30 +434,40 @@ function next_step() {
         if (!cell_in_list(visitedCells, cell.row, cell.col)) {
             let safeCheck = ask_if_safe(cell.row, cell.col);
 
-            add_log("Checking (" + cell.row + ", " + cell.col + "): safe = " + safeCheck.safe + ".");
+            add_log("ASK KB: Is (" + cell.row + ", " + cell.col + ") safe?");
 
             if (safeCheck.safe) {
                 add_to_list(safeCells, cell.row, cell.col);
+                add_log("Result: Safe");
                 nextCell = cell;
                 break;
             }
 
-            check_confirmed_hazard(cell.row, cell.col);
+            add_log("Result: Not proven safe");
         }
     }
 
     if (nextCell === null) {
-        add_log("No provably safe unvisited adjacent cell found.");
+        lastMoveDecision = "No safe adjacent move";
+        statusMessage = get_stuck_message(adjacentCells);
+        add_log(statusMessage);
         gameOver = true;
         nextButton.disabled = true;
         reveal_actual_hazards();
+        add_log("Game over. Hidden world is now shown.");
+        stop_auto_run();
     } else {
         agentRow = nextCell.row;
         agentCol = nextCell.col;
+        set_current_percepts_from_percept(get_percepts(agentRow, agentCol));
+        lastMoveDecision = "Moved to (" + agentRow + ", " + agentCol + ")";
+        statusMessage = "Agent moved safely.";
         add_log("Agent moved to (" + agentRow + ", " + agentCol + ").");
     }
 
+    scan_unknown_cells_for_hazards();
     update_unknown_cells();
+    update_buttons();
     update_gui();
 }
 
@@ -407,6 +494,20 @@ function get_percepts(row, col) {
     };
 }
 
+function set_current_percepts_from_percept(percept) {
+    currentPercepts = [];
+
+    if (percept.breeze) {
+        currentPercepts.push("Breeze");
+    }
+    if (percept.stench) {
+        currentPercepts.push("Stench");
+    }
+    if (currentPercepts.length === 0) {
+        currentPercepts.push("None");
+    }
+}
+
 function check_confirmed_hazard(row, col) {
     let pitSymbol = make_symbol("P", row, col);
     let wumpusSymbol = make_symbol("W", row, col);
@@ -415,8 +516,33 @@ function check_confirmed_hazard(row, col) {
 
     if (pitResult.proven || wumpusResult.proven) {
         add_to_list(confirmedHazardCells, row, col);
+        lastQueryText = "ASK KB: Is cell (" + row + ", " + col + ") a hazard?";
+        lastQueryResultText = "Hazard proven";
+        lastExplanation = pitResult.explanation.concat(wumpusResult.explanation).slice(0, 6);
         add_log("Hazard confirmed at (" + row + ", " + col + ") by the KB.");
+        return true;
     }
+
+    return false;
+}
+
+function scan_unknown_cells_for_hazards() {
+    let cellsToCheck = unknownCells.slice();
+
+    for (let i = 0; i < cellsToCheck.length; i++) {
+        let cell = cellsToCheck[i];
+        check_confirmed_hazard(cell.row, cell.col);
+    }
+}
+
+function reveal_hidden_world() {
+    hiddenWorldRevealed = true;
+    reveal_actual_hazards();
+    lastMoveDecision = "Hidden world revealed";
+    statusMessage = "Hidden Wumpus and pits are now visible.";
+    add_log("Reveal Hidden World clicked.");
+    update_unknown_cells();
+    update_gui();
 }
 
 function reveal_actual_hazards() {
@@ -425,8 +551,6 @@ function reveal_actual_hazards() {
     for (let i = 0; i < pitCells.length; i++) {
         add_to_list(confirmedHazardCells, pitCells[i].row, pitCells[i].col);
     }
-
-    add_log("Episode stopped. Actual hazards are now shown.");
 }
 
 function update_unknown_cells() {
@@ -443,6 +567,64 @@ function update_unknown_cells() {
     }
 }
 
+function start_auto_run() {
+    if (gameOver) {
+        return;
+    }
+
+    if (autoRunTimer !== null) {
+        return;
+    }
+
+    statusMessage = "Auto run is active.";
+    autoButton.disabled = true;
+    stopButton.disabled = false;
+    add_log("Auto Run started.");
+
+    autoRunTimer = setInterval(run_auto_step, 900);
+    update_gui();
+}
+
+function run_auto_step() {
+    if (gameOver) {
+        stop_auto_run();
+        return;
+    }
+
+    next_step();
+}
+
+function stop_auto_run() {
+    if (autoRunTimer !== null) {
+        clearInterval(autoRunTimer);
+        autoRunTimer = null;
+    }
+
+    update_buttons();
+}
+
+function reset_episode() {
+    stop_auto_run();
+    rowsInput.value = "";
+    colsInput.value = "";
+    start_new_episode();
+    add_log("Reset to default 4x4 episode.");
+}
+
+function update_buttons() {
+    if (gameOver) {
+        nextButton.disabled = true;
+        autoButton.disabled = true;
+        stopButton.disabled = true;
+    } else {
+        nextButton.disabled = false;
+        autoButton.disabled = autoRunTimer !== null;
+        stopButton.disabled = autoRunTimer === null;
+    }
+
+    revealButton.disabled = false;
+}
+
 function update_gui() {
     gridDiv.innerHTML = "";
     gridDiv.style.gridTemplateColumns = "repeat(" + cols + ", minmax(42px, 1fr))";
@@ -451,34 +633,144 @@ function update_gui() {
         for (let col = 1; col <= cols; col++) {
             let cellDiv = document.createElement("div");
             cellDiv.className = "cell unknown";
-            cellDiv.textContent = row + "," + col;
+            let stateText = "Unknown";
 
             if (cell_in_list(confirmedHazardCells, row, col)) {
                 cellDiv.className = "cell hazard";
-                cellDiv.textContent = get_hazard_name(row, col);
+                stateText = get_hazard_name(row, col);
             }
 
             if (cell_in_list(visitedCells, row, col) || cell_in_list(safeCells, row, col)) {
                 cellDiv.className = "cell visited";
-                cellDiv.textContent = "Safe";
+                stateText = "Safe";
             }
 
             if (agentRow === row && agentCol === col && !gameOver) {
                 cellDiv.className = "cell agent";
-                cellDiv.textContent = "Agent";
+                stateText = "Agent";
             }
+
+            cellDiv.appendChild(make_cell_line("(" + row + "," + col + ")", "cell-coord"));
+            cellDiv.appendChild(make_cell_line(stateText, "cell-state"));
 
             gridDiv.appendChild(cellDiv);
         }
     }
 
+    gridSizeText.textContent = rows + " x " + cols;
     locationText.textContent = "(" + agentRow + ", " + agentCol + ")";
     if (currentPercepts.length === 0) {
         perceptText.textContent = "Not sensed yet";
     } else {
         perceptText.textContent = currentPercepts.join(", ");
     }
+    visitedText.textContent = visitedCells.length;
+    safeText.textContent = safeCells.length;
+    hazardText.textContent = confirmedHazardCells.length;
     stepsText.textContent = totalInferenceSteps;
+    decisionText.textContent = lastMoveDecision;
+    statusText.textContent = statusMessage;
+    update_status_style();
+    update_kb_panel();
+}
+
+function make_cell_line(text, className) {
+    let line = document.createElement("div");
+    line.className = className;
+    line.textContent = text;
+    return line;
+}
+
+function update_status_style() {
+    statusText.className = "";
+
+    if (statusMessage.includes("moved") || statusMessage.includes("running")) {
+        statusText.className = "status-good";
+    }
+
+    if (statusMessage.includes("No provably") ||
+        statusMessage.includes("stuck") ||
+        statusMessage.includes("hazard") ||
+        statusMessage.includes("explored")) {
+        statusText.className = "status-warn";
+    }
+}
+
+function update_kb_panel() {
+    kbFactsArea.innerHTML = "";
+
+    if (recentKbFacts.length === 0) {
+        kbFactsArea.appendChild(make_small_line("No facts added yet."));
+    } else {
+        for (let i = 0; i < recentKbFacts.length; i++) {
+            kbFactsArea.appendChild(make_small_line(recentKbFacts[i]));
+        }
+    }
+
+    lastQueryTextArea.textContent = lastQueryText;
+    lastResultText.textContent = lastQueryResultText;
+    explanationArea.innerHTML = "";
+
+    if (lastExplanation.length === 0) {
+        explanationArea.appendChild(make_small_line("No resolution explanation yet."));
+    } else {
+        for (let j = 0; j < lastExplanation.length; j++) {
+            explanationArea.appendChild(make_small_line(lastExplanation[j]));
+        }
+    }
+}
+
+function make_small_line(text) {
+    let line = document.createElement("div");
+    line.className = "small-line";
+    line.textContent = text;
+    return line;
+}
+
+function format_percepts_for_log(percept) {
+    let breezeText = "No Breeze";
+    let stenchText = "No Stench";
+
+    if (percept.breeze) {
+        breezeText = "Breeze";
+    }
+
+    if (percept.stench) {
+        stenchText = "Stench";
+    }
+
+    return breezeText + ", " + stenchText;
+}
+
+function get_stuck_message(adjacentCells) {
+    let unvisitedCount = 0;
+
+    for (let i = 0; i < adjacentCells.length; i++) {
+        let cell = adjacentCells[i];
+
+        if (!cell_in_list(visitedCells, cell.row, cell.col) &&
+            !cell_in_list(confirmedHazardCells, cell.row, cell.col)) {
+            unvisitedCount++;
+        }
+    }
+
+    if (unvisitedCount === 0) {
+        return "All reachable safe adjacent cells are explored. Agent is stuck.";
+    }
+
+    return "No provably safe unvisited adjacent cell found. Agent is stuck.";
+}
+
+function agent_is_on_actual_hazard() {
+    if (cell_in_list(pitCells, agentRow, agentCol)) {
+        return true;
+    }
+
+    if (wumpusCell.row === agentRow && wumpusCell.col === agentCol) {
+        return true;
+    }
+
+    return false;
 }
 
 function get_hazard_name(row, col) {

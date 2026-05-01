@@ -10,38 +10,73 @@
     <div class="page">
         <h1>Dynamic Pathfinding Agent</h1>
 
-        <div class="controls">
-            <label>
-                Rows
-                <input type="number" id="rowsInput" min="2" placeholder="4">
-            </label>
+        <div class="card controls-card">
+            <div class="controls">
+                <label>
+                    Rows
+                    <input type="number" id="rowsInput" min="2" placeholder="4">
+                </label>
 
-            <label>
-                Columns
-                <input type="number" id="colsInput" min="2" placeholder="4">
-            </label>
+                <label>
+                    Columns
+                    <input type="number" id="colsInput" min="2" placeholder="4">
+                </label>
 
-            <button id="startButton">Start New Episode</button>
-            <button id="nextButton" disabled>Next Step</button>
+                <button id="startButton">Start New Episode</button>
+                <button id="nextButton" disabled>Next Step</button>
+                <button id="autoButton" disabled>Auto Run</button>
+                <button id="stopButton" disabled>Stop Auto Run</button>
+                <button id="revealButton" disabled>Reveal Hidden World</button>
+                <button id="resetButton">Reset</button>
+            </div>
         </div>
 
-        <div class="info">
-            <p><strong>Current Location:</strong> <span id="locationText">-</span></p>
-            <p><strong>Current Percepts:</strong> <span id="perceptText">-</span></p>
-            <p><strong>Total Inference Steps:</strong> <span id="stepsText">0</span></p>
+        <div class="layout">
+            <div class="left-panel">
+                <div class="card">
+                    <div class="legend">
+                        <span><span class="legend-box agent-color"></span>Agent</span>
+                        <span><span class="legend-box visited-color"></span>Safe</span>
+                        <span><span class="legend-box unknown-color"></span>Unknown</span>
+                        <span><span class="legend-box hazard-color"></span>Hazard</span>
+                    </div>
+
+                    <div id="grid" class="grid"></div>
+                </div>
+            </div>
+
+            <div class="right-panel">
+                <div class="card">
+                    <h2>Metrics Dashboard</h2>
+                    <div class="metric-list">
+                        <p><strong>Grid Size:</strong> <span id="gridSizeText">-</span></p>
+                        <p><strong>Agent Position:</strong> <span id="locationText">-</span></p>
+                        <p><strong>Current Percepts:</strong> <span id="perceptText">-</span></p>
+                        <p><strong>Visited Cells:</strong> <span id="visitedText">0</span></p>
+                        <p><strong>Safe Cells Proven:</strong> <span id="safeText">0</span></p>
+                        <p><strong>Confirmed Hazards:</strong> <span id="hazardText">0</span></p>
+                        <p><strong>Resolution Steps:</strong> <span id="stepsText">0</span></p>
+                        <p><strong>Last Move Decision:</strong> <span id="decisionText">-</span></p>
+                        <p><strong>Status:</strong> <span id="statusText">-</span></p>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>KB / Inference Panel</h2>
+                    <p><strong>Recent KB Facts:</strong></p>
+                    <div id="kbFactsArea" class="small-panel"></div>
+                    <p><strong>Last Query:</strong> <span id="lastQueryText">-</span></p>
+                    <p><strong>Result:</strong> <span id="lastResultText">-</span></p>
+                    <p><strong>Resolution Explanation:</strong></p>
+                    <div id="explanationArea" class="small-panel"></div>
+                </div>
+            </div>
         </div>
 
-        <div class="legend">
-            <span><span class="legend-box agent-color"></span>Agent</span>
-            <span><span class="legend-box visited-color"></span>Visited Safe</span>
-            <span><span class="legend-box unknown-color"></span>Unknown</span>
-            <span><span class="legend-box hazard-color"></span>Confirmed Hazard</span>
+        <div class="card">
+            <h2>Agent Decision Log</h2>
+            <div id="logArea" class="log-area"></div>
         </div>
-
-        <div id="grid" class="grid"></div>
-
-        <h2>Agent Log</h2>
-        <div id="logArea" class="log-area"></div>
     </div>
 
     <script src="script.js"></script>
