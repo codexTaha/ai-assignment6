@@ -3,7 +3,7 @@
 ## Links
 
 - GitHub repo link: https://github.com/codexTaha/ai-assignment6
-- Vercel live link: Add after Vercel deployment
+- Render live link: Add after Render deployment
 - LinkedIn post link: Skipped for now
 
 ## Screenshot Checklist
@@ -31,14 +31,17 @@
 - Resolution step count updates
 - Hidden hazards are not visible before reveal or game over
 - App runs as a static site
+- Flask app runs locally at http://127.0.0.1:5000
+- Core AI logic is in Python
+- JavaScript only renders and calls APIs
 - No console errors during normal use
-- Git commit history has Step 1, Step 2, and Step 3 commits
+- Git commit history shows iterative development
 
 ## Deployment Checklist
 
 - Push final code to GitHub
-- Import GitHub repo in Vercel
-- Use Framework Preset: Other
-- Leave Build Command empty
-- Leave Output Directory empty or root
+- Create Render Web Service
+- Connect GitHub repo
+- Build command: pip install -r requirements.txt
+- Start command: gunicorn app:app
 - Deploy and copy live URL

@@ -4,11 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dynamic Wumpus World Agent</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <div class="page">
-        <h1>Dynamic Pathfinding Agent</h1>
+        <h1>Dynamic Wumpus World Knowledge-Based Agent</h1>
 
         <div class="card controls-card">
             <div class="controls">
@@ -79,6 +79,6 @@
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>

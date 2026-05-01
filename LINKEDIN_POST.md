@@ -9,6 +9,6 @@ The main logic is based on CNF clauses and Resolution Refutation. Before moving,
 The hardest part was designing the logic rules, CNF representation, and resolution engine in a way that was simple enough to explain but still correct for the assignment. It was also interesting to connect the AI reasoning with a live web dashboard showing percepts, inference steps, KB facts, and movement decisions.
 
 Tech used:
-HTML, CSS, Vanilla JavaScript, Propositional Logic, CNF, Resolution Refutation.
+Python, Flask, HTML, CSS, Vanilla JavaScript, Propositional Logic, CNF, Resolution Refutation.
 
 #ArtificialIntelligence #KnowledgeBasedAgent #PropositionalLogic #WumpusWorld #WebDevelopment #FASTNUCES

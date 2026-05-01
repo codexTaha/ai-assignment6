@@ -2,54 +2,127 @@
 
 ## Project Overview
 
-This project is a web-based dynamic pathfinding agent based on the Wumpus World problem. The agent acts as a Knowledge-Based Agent because it does not know the hidden world at the start. It receives percepts as it moves, stores facts in a Knowledge Base, and uses Propositional Logic with Resolution Refutation to decide which cells are safe.
+This project is a Python-backed web application for a Dynamic Wumpus World Knowledge-Based Agent. The agent uses Propositional Logic and Resolution Refutation to decide which cells are safe before moving.
 
-The main goal is to show how an AI agent can use logic instead of random movement. The agent only moves to a cell when it can prove that the cell has no pit and no Wumpus.
+The Wumpus World is generated dynamically. The agent does not know the hidden Wumpus or pit locations at the start. As it moves, it receives Breeze and Stench percepts, tells facts to its Knowledge Base, asks logical queries, and moves only when safety is provable.
+
+## Main Language
+
+Python
+
+## Core AI Logic
+
+The core AI logic is implemented in Python in `ai_logic.py`.
+
+Python handles:
+
+- Wumpus World generation
+- Random Wumpus and pit placement
+- Percept generation
+- Knowledge Base facts and rules
+- CNF clauses
+- Resolution Refutation
+- Safe-cell deduction
+- Pathfinding and movement decisions
+
+## Frontend
+
+The frontend uses HTML, CSS, and Vanilla JavaScript only for visualization and API calls.
+
+JavaScript handles:
+
+- Button clicks
+- Calling Flask APIs with `fetch()`
+- Rendering the grid
+- Updating dashboard values
+- Showing KB facts, resolution steps, and logs
+
+JavaScript does not perform the AI reasoning.
+
+## Architecture
+
+- Flask backend runs the AI engine.
+- Frontend sends button actions to Python APIs.
+- Python updates the game state and returns JSON.
+- JavaScript only renders the returned state.
+
+Project structure:
+
+```text
+project_folder/
+├── app.py
+├── ai_logic.py
+├── requirements.txt
+├── README.md
+├── LINKEDIN_POST.md
+├── SUBMISSION_CHECKLIST.md
+├── render_start_command.txt
+├── templates/
+│   └── index.html
+└── static/
+    ├── style.css
+    └── script.js
+```
+
+## Why Python is used for AI Logic
+
+The assignment requires the main AI functionality to be implemented in Python. Therefore, Wumpus World generation, percept generation, Knowledge Base, CNF clauses, Resolution Refutation, safe-cell deduction, and movement decisions are all implemented in Python.
+
+JavaScript is used only for the web interface.
 
 ## Features
 
 - Dynamic grid sizing
-- Random pits and Wumpus placement
-- Hidden hazards at the start of each episode
+- Random pits and Wumpus
+- Hidden hazards at the start
 - Dynamic percept generation
-- Breeze percept near pits
-- Stench percept near the Wumpus
+- Breeze and Stench
 - Knowledge Base TELL/ASK cycle
-- CNF clause representation
-- Resolution Refutation algorithm
-- Safe cell deduction before movement
+- CNF clauses
+- Resolution Refutation
+- Safe cell deduction
 - Web grid visualization
 - Real-time metrics dashboard
 - Agent decision log
-- Knowledge Base and inference panel
+- KB / inference panel
 - Reveal hidden world option
-- Auto Run and Stop Auto Run controls
+- Auto Run and Stop Auto Run
 
 ## AI Concepts Used
 
 ### Knowledge-Based Agent
 
-The agent stores information about the world in a Knowledge Base and uses that knowledge to make decisions.
+The agent stores facts in a Knowledge Base and uses those facts to make movement decisions.
 
 ### Propositional Logic
 
-The project uses symbols such as `P_1_2`, `W_2_3`, `B_1_1`, and `S_1_1` to represent facts about cells.
+The world is represented using symbols like:
+
+- `P_1_2` means Pit at row 1, column 2
+- `W_2_3` means Wumpus at row 2, column 3
+- `B_1_1` means Breeze at row 1, column 1
+- `S_1_1` means Stench at row 1, column 1
 
 ### Percepts
 
-The agent receives percepts from the current cell:
+The agent receives percepts at its current cell:
 
-- Breeze means there may be a pit in an adjacent cell.
-- Stench means there may be a Wumpus in an adjacent cell.
-- No Breeze and No Stench help the agent prove nearby cells are safe.
+- Breeze if there is an adjacent pit
+- Stench if there is an adjacent Wumpus
+- None if no Breeze or Stench exists
 
 ### Knowledge Base
 
-The Knowledge Base stores facts and rules. When the agent visits a cell, it tells the KB what it knows about that cell and its percepts.
+When the agent visits a cell, it tells the KB:
+
+- The current cell has no pit
+- The current cell has no Wumpus
+- Whether Breeze exists
+- Whether Stench exists
 
 ### CNF
 
-Rules are stored as CNF clauses. A clause is an array of literals, for example:
+The rules are stored as CNF clauses. A clause is a list of literals, for example:
 
 ```text
 ["!B_1_1", "P_1_2", "P_2_1"]
@@ -57,95 +130,111 @@ Rules are stored as CNF clauses. A clause is an array of literals, for example:
 
 ### Resolution Refutation
 
-The agent asks the KB if a query is true by using resolution. If the query can be proven, the agent uses that result for movement.
+The project proves queries using Resolution Refutation. This is used to prove whether a cell has no pit and no Wumpus.
 
 ### Pathfinding Using Logical Inference
 
-The agent does not move randomly into unknown cells. It checks adjacent cells and moves only when the KB proves the cell is safe.
+The agent checks adjacent cells and moves only if the Knowledge Base proves the cell is safe.
 
 ## How the Agent Works
 
 1. Agent starts at `(1,1)`.
-2. It receives percepts from the current cell.
-3. It tells the KB new facts about the current cell.
+2. It receives percepts.
+3. It tells the KB new facts.
 4. It asks if adjacent cells are safe.
 5. It moves only to provably safe cells.
 6. It stops if no safe move is provable.
 
 ## Resolution Refutation
 
-To prove a query `Q`, the project uses this simple process:
+To prove a query:
 
-1. Add the negation of the query, `NOT Q`, to a temporary copy of the KB.
-2. Resolve pairs of clauses.
+1. Add the negation of the query to a temporary copy of the KB.
+2. Resolve clauses.
 3. If an empty clause is produced, a contradiction is found.
-4. Because `NOT Q` caused a contradiction, the original query `Q` is proven true.
+4. Therefore, the original query is true.
 
-For example, to prove that cell `(1,2)` has no pit, the agent asks:
+Example query:
 
 ```text
 !P_1_2
 ```
 
-If the KB proves both `!P_1_2` and `!W_1_2`, the cell is marked safe.
+This asks whether cell `(1,2)` has no pit.
 
 ## Tech Stack
 
+- Python
+- Flask
 - HTML
 - CSS
 - Vanilla JavaScript
 - GitHub
-- Vercel or GitHub Pages
+- Render
 
 ## How to Run Locally
 
-You can run this project as a static website.
-
-Option 1: Open directly
-
-1. Open the project folder.
-2. Open `index.html` in your browser.
-
-Option 2: Use VS Code Live Server
-
-1. Open the project folder in VS Code.
-2. Install the Live Server extension if needed.
-3. Right click `index.html`.
-4. Click `Open with Live Server`.
-
-Option 3: Use Python local server
+1. Create virtual environment:
 
 ```bash
-python3 -m http.server 8000
+python -m venv venv
 ```
 
-Then open:
+2. Activate it:
+
+Linux/Mac:
+
+```bash
+source venv/bin/activate
+```
+
+Windows:
+
+```bash
+venv\Scripts\activate
+```
+
+3. Install requirements:
+
+```bash
+pip install -r requirements.txt
+```
+
+4. Run:
+
+```bash
+python app.py
+```
+
+5. Open:
 
 ```text
-http://localhost:8000
+http://127.0.0.1:5000
 ```
 
 ## Deployment
 
-### Vercel Deployment
+GitHub Pages alone cannot run this project because GitHub Pages only hosts static frontend files. This project needs a Python backend.
 
-1. Push the project to GitHub.
-2. Go to Vercel.
-3. Click `Add New Project`.
-4. Import the GitHub repository.
-5. Set Framework Preset to `Other`.
-6. Leave Build Command empty.
-7. Leave Output Directory empty or use the project root.
-8. Click `Deploy`.
+### Render Deployment
 
-### GitHub Pages Deployment
+1. Push project to GitHub.
+2. Go to Render.
+3. Click `New Web Service`.
+4. Connect the GitHub repository.
+5. Build command:
 
-1. Push the project to GitHub.
-2. Open the repository settings.
-3. Go to `Pages`.
-4. Select the branch, usually `main`.
-5. Select root folder.
-6. Save and wait for the live URL.
+```bash
+pip install -r requirements.txt
+```
+
+6. Start command:
+
+```bash
+gunicorn app:app
+```
+
+7. Deploy.
 
 ## Screenshots
 
