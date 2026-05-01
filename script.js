@@ -15,7 +15,6 @@ let confirmedHazardCells = [];
 let currentPercepts = [];
 let totalInferenceSteps = 0;
 let gameOver = false;
-let hiddenWorldRevealed = false;
 let autoRunTimer = null;
 let lastMoveDecision = "-";
 let statusMessage = "Ready";
@@ -342,7 +341,6 @@ function start_new_episode() {
     currentPercepts = [];
     totalInferenceSteps = 0;
     gameOver = false;
-    hiddenWorldRevealed = false;
     lastMoveDecision = "Episode started";
     statusMessage = "Episode running";
     recentKbFacts = [];
@@ -536,7 +534,6 @@ function scan_unknown_cells_for_hazards() {
 }
 
 function reveal_hidden_world() {
-    hiddenWorldRevealed = true;
     reveal_actual_hazards();
     lastMoveDecision = "Hidden world revealed";
     statusMessage = "Hidden Wumpus and pits are now visible.";
