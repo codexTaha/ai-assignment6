@@ -62,6 +62,8 @@ def make_new_game(rows, cols):
     }
 
     all_cells = []
+    start_neighbors = get_adjacent_cells(1, 1, rows, cols)
+
     for row in range(1, rows + 1):
         for col in range(1, cols + 1):
             if not (row == 1 and col == 1):
@@ -69,7 +71,19 @@ def make_new_game(rows, cols):
 
     random.shuffle(all_cells)
 
-    state["wumpus"] = all_cells[0]
+    safe_start_cells = []
+    later_cells = []
+
+    for cell in all_cells:
+        if cell_in_list(start_neighbors, cell["row"], cell["col"]) or cell["row"] + cell["col"] <= 4:
+            later_cells.append(cell)
+        else:
+            safe_start_cells.append(cell)
+
+    if len(safe_start_cells) > 0:
+        state["wumpus"] = safe_start_cells[0]
+    else:
+        state["wumpus"] = all_cells[0]
 
     pit_count = int((rows * cols) * 0.20)
     if pit_count < 2 and len(all_cells) > 2:
@@ -78,10 +92,14 @@ def make_new_game(rows, cols):
         pit_count = 1
 
     state["pits"] = []
-    index = 1
-    while index < len(all_cells) and len(state["pits"]) < pit_count:
-        state["pits"].append(all_cells[index])
-        index += 1
+    pit_choices = safe_start_cells[1:] + later_cells
+
+    for cell in pit_choices:
+        if len(state["pits"]) >= pit_count:
+            break
+
+        if not same_cell(cell, state["wumpus"]):
+            state["pits"].append(cell)
 
     build_world_rules(state)
     add_cell(state["visited"], 1, 1)
@@ -224,6 +242,33 @@ def tell_current_cell_to_kb(state):
     if len(facts_added) > 0:
         state["decision_log"].append("TELL KB: " + ", ".join(facts_added))
 
+    add_obvious_safe_facts(state, row, col, percepts, facts_added)
+
+
+def add_obvious_safe_facts(state, row, col, percepts, facts_added):
+    adjacent_cells = get_adjacent_cells(row, col, state["rows"], state["cols"])
+    derived_facts = []
+
+    for cell in adjacent_cells:
+        pit_symbol = make_symbol("P", cell["row"], cell["col"])
+        wumpus_symbol = make_symbol("W", cell["row"], cell["col"])
+
+        # No Breeze means no adjacent cell has a pit.
+        if not percepts["breeze"]:
+            if add_fact(state, "!" + pit_symbol):
+                derived_facts.append("!" + pit_symbol)
+
+        # No Stench means no adjacent cell has Wumpus.
+        if not percepts["stench"]:
+            if add_fact(state, "!" + wumpus_symbol):
+                derived_facts.append("!" + wumpus_symbol)
+
+        if literal_known(state, "!" + pit_symbol) and literal_known(state, "!" + wumpus_symbol):
+            add_cell(state["safe_cells"], cell["row"], cell["col"])
+
+    if len(derived_facts) > 0:
+        state["decision_log"].append("Derived safe facts: " + ", ".join(derived_facts))
+
 
 def negate_literal(literal):
     if literal.startswith("!"):
@@ -272,12 +317,26 @@ def resolve_two_clauses(clause1, clause2):
 
 
 def resolution_refutation(state, query_literal):
+    if literal_known(state, query_literal):
+        return {
+            "proven": True,
+            "steps": 1,
+            "explanation": ["Known KB fact: " + query_literal]
+        }
+
+    if literal_known(state, negate_literal(query_literal)):
+        return {
+            "proven": False,
+            "steps": 1,
+            "explanation": ["Opposite fact is known: " + negate_literal(query_literal)]
+        }
+
     clauses = copy_clauses(state["kb_clauses"])
     clauses.append([negate_literal(query_literal)])
 
     explanation = []
     steps = 0
-    max_steps = 500
+    max_steps = 80
 
     while steps < max_steps:
         new_clauses = []
@@ -371,14 +430,14 @@ def ask_if_safe(state, row, col):
 def update_safe_and_hazard_cells(state):
     for row in range(1, state["rows"] + 1):
         for col in range(1, state["cols"] + 1):
-            no_pit = ask_if_true(state, "!" + make_symbol("P", row, col))
-            no_wumpus = ask_if_true(state, "!" + make_symbol("W", row, col))
+            no_pit = literal_known(state, "!" + make_symbol("P", row, col))
+            no_wumpus = literal_known(state, "!" + make_symbol("W", row, col))
 
             if no_pit and no_wumpus:
                 add_cell(state["safe_cells"], row, col)
 
-            has_pit = ask_if_true(state, make_symbol("P", row, col))
-            has_wumpus = ask_if_true(state, make_symbol("W", row, col))
+            has_pit = literal_known(state, make_symbol("P", row, col))
+            has_wumpus = literal_known(state, make_symbol("W", row, col))
 
             if has_pit or has_wumpus:
                 add_cell(state["confirmed_hazards"], row, col)
@@ -394,8 +453,54 @@ def choose_next_move(state):
 
     for cell in adjacent_cells:
         if not cell_in_list(state["visited"], cell["row"], cell["col"]):
-            if ask_if_safe(state, cell["row"], cell["col"]):
+            if cell_in_list(state["safe_cells"], cell["row"], cell["col"]):
+                state["decision_log"].append(
+                    "ASK KB: Is (" + str(cell["row"]) + "," + str(cell["col"]) + ") safe?"
+                )
+                state["last_query"] = "ASK KB: Is cell (" + str(cell["row"]) + "," + str(cell["col"]) + ") safe?"
+                state["last_query_result"] = "Proven safe"
+                state["last_resolution_steps"] = ["Known facts prove no pit and no Wumpus."]
+                state["decision_log"].append("Result: Safe")
                 return cell
+
+            if ask_if_safe(state, cell["row"], cell["col"]):
+                add_cell(state["safe_cells"], cell["row"], cell["col"])
+                return cell
+
+    path_move = find_step_towards_unvisited_safe_cell(state)
+    if path_move is not None:
+        state["decision_log"].append(
+            "Moving through known safe cell toward another safe unvisited cell."
+        )
+        return path_move
+
+    return None
+
+
+def find_step_towards_unvisited_safe_cell(state):
+    queue = []
+    checked = []
+    start = {"row": state["agent_row"], "col": state["agent_col"], "path": []}
+    queue.append(start)
+
+    while len(queue) > 0:
+        current = queue.pop(0)
+
+        if cell_in_list(checked, current["row"], current["col"]):
+            continue
+
+        add_cell(checked, current["row"], current["col"])
+
+        if not cell_in_list(state["visited"], current["row"], current["col"]) and len(current["path"]) > 0:
+            return current["path"][0]
+
+        neighbors = get_adjacent_cells(current["row"], current["col"], state["rows"], state["cols"])
+
+        for cell in neighbors:
+            if cell_in_list(state["safe_cells"], cell["row"], cell["col"]) and not cell_in_list(checked, cell["row"], cell["col"]):
+                new_path = current["path"][:]
+                new_path.append({"row": cell["row"], "col": cell["col"]})
+                queue.append({"row": cell["row"], "col": cell["col"], "path": new_path})
 
     return None
 
@@ -485,6 +590,18 @@ def add_cell(cell_list, row, col):
 def cell_in_list(cell_list, row, col):
     for cell in cell_list:
         if cell["row"] == row and cell["col"] == col:
+            return True
+
+    return False
+
+
+def same_cell(cell1, cell2):
+    return cell1["row"] == cell2["row"] and cell1["col"] == cell2["col"]
+
+
+def literal_known(state, literal):
+    for clause in state["kb_clauses"]:
+        if len(clause) == 1 and clause[0] == literal:
             return True
 
     return False
